@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Kite basket</title>
+<style>
+:root{--bg:#fafafa;--fg:#111;--mut:#555;--line:#ccc;--btn:#387ed1}
+@media (prefers-color-scheme:dark){:root{--bg:#121212;--fg:#eee;--mut:#aaa;--line:#444}}
+body{font:16px -apple-system,Helvetica,Arial,sans-serif;margin:16px;background:var(--bg);color:var(--fg)}
+h2{font-size:19px;margin:0 0 10px}
+#t{overflow-x:auto}
+table{border-collapse:collapse;margin:8px 0}
+td,th{border:1px solid var(--line);padding:5px 6px;text-align:right;font-size:14px;white-space:nowrap}
+th{text-align:left}
+button{font-size:18px;padding:12px 20px;background:var(--btn);color:#fff;border:0;border-radius:6px;margin-top:10px}
+p{color:var(--mut);font-size:14px}
+</style>
+</head>
+<body>
+<h2 id="h">Opening Kite...</h2>
+<div id="t"></div>
+<form id="f" method="post" action="https://kite.zerodha.com/connect/basket">
+<input type="hidden" name="api_key" id="k">
+<input type="hidden" name="data" id="d">
+<button id="b" type="submit">Open in Kite</button>
+</form>
+<p>Kite opens with the order filled in. Check symbol, qty and price. <b>You</b> press Place, or close the tab. Nothing is placed by this page.</p>
+<p>This page stores nothing and sends nothing anywhere except to Kite. The order and key travel only in the part of the link after #, which never reaches this website.</p>
+<script>
+(function () {
+  var H = document.getElementById("h"), F = document.getElementById("f");
+  function bad(msg) { H.textContent = msg; F.style.display = "none"; }
+  var p = new URLSearchParams(location.hash.slice(1));
+  var key = p.get("k"), raw = p.get("o");
+  if (!key || !raw) { bad("No order in this link."); return; }
+  var orders;
+  try {
+    var s = raw.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var bin = atob(s), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    orders = JSON.parse(new TextDecoder().decode(bytes));
+  } catch (e) { bad("This link is damaged."); return; }
+  if (!Array.isArray(orders) || orders.length < 1 || orders.length > 20) { bad("This link is damaged."); return; }
+  var ok = orders.every(function (o) {
+    return o && typeof o.tradingsymbol === "string" && (o.transaction_type === "SELL" || o.transaction_type === "BUY") &&
+      o.exchange === "NFO" && Number(o.quantity) > 0 && Number(o.price) > 0;
+  });
+  if (!ok) { bad("This link is damaged."); return; }
+  var tb = document.createElement("table"), tr = tb.insertRow();
+  ["Kite symbol", "Side", "Qty", "Limit", "Product", "Premium"].forEach(function (x) {
+    var th = document.createElement("th"); th.textContent = x; tr.appendChild(th);
+  });
+  orders.forEach(function (o) {
+    var r = tb.insertRow();
+    [o.tradingsymbol, o.transaction_type, o.quantity, Number(o.price).toFixed(2), o.product || "",
+     "₹" + Math.round(o.quantity * o.price).toLocaleString("en-IN")].forEach(function (v) { r.insertCell().textContent = v; });
+  });
+  document.getElementById("t").appendChild(tb);
+  document.getElementById("k").value = key;
+  document.getElementById("d").value = JSON.stringify(orders);
+  H.textContent = orders.length === 1 ? "Opening Kite with this order..." : "Opening Kite with " + orders.length + " orders...";
+  try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  if (p.get("auto") !== "0") setTimeout(function () { F.submit(); }, 700);
+  else H.textContent = "Check, then tap Open in Kite";
+})();
+</script>
+</body>
+</html>
